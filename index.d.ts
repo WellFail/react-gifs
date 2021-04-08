@@ -1,4 +1,4 @@
-import { FC, CSSProperties } from "react";
+import { FC, ForwardedRef, CSSProperties } from "react";
 
 type State = {
   width?: number;
@@ -20,16 +20,17 @@ declare function usePlayback(
   cb: () => void
 ): void;
 
-type ParserCallbackArgs = {
-  width: number;
-  height: number;
-  delays: number[];
-  frames: ImageData[];
-}
+type ParserCallbackArgs =
+  | {
+      loaded: true;
+      width: number;
+      height: number;
+      delays: number[];
+      frames: ImageData[];
+    }
+  | { loaded: true; error: Error };
 
-type parserCallback = (
-  gifInfo: ParserCallbackArgs,
-) => void;
+type parserCallback = (gifInfo: ParserCallbackArgs) => void;
 
 declare function useParser(
   str: string | boolean | undefined | null,
@@ -46,6 +47,7 @@ declare const Canvas: FC<{
   frames: ImageData[];
   width?: number;
   height?: number;
+  ref?: ForwardedRef<HTMLCanvasElement>;
   fit?: "cover" | "contain" | "fill";
   className?: string;
   style?: CSSProperties;

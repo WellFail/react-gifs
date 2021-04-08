@@ -1,9 +1,31 @@
 import { parseGIF, decompressFrames } from "gifuct-js";
 
+const validateAndFix = (gif) => {
+  let currentGce = null;
+  for (const frame of gif.frames) {
+    currentGce = frame.gce ? frame.gce : currentGce;
+
+    // fix loosing graphic control extension for same frames
+    if ("image" in frame && !("gce" in frame)) {
+      frame.gce = currentGce;
+    }
+  }
+};
+
 export const parse = (src, { signal }) =>
   fetch(src, { signal })
-    .then((resp) => resp.arrayBuffer())
+    .then((resp) => {
+      if (resp.headers.get("Content-Type") !== "image/gif")
+        throw Error(
+          `Wrong content type: "${resp.headers.get("Content-Type")}"`
+        );
+      return resp.arrayBuffer();
+    })
     .then((buffer) => parseGIF(buffer))
+    .then((gif) => {
+      validateAndFix(gif);
+      return gif;
+    })
     .then((gif) =>
       Promise.all([
         decompressFrames(gif, false),
@@ -11,13 +33,14 @@ export const parse = (src, { signal }) =>
       ])
     )
     .then(([frames, options]) => {
-      let readyFrames = [];
+      const readyFrames = [];
+      const size = options.width * options.height * 4;
 
       for (let i = 0; i < frames.length; ++i) {
         const frame = frames[i];
-        let typedArray =
-          frame.disposalType === 2 || i === 0
-            ? new Uint8ClampedArray(options.width * options.height * 4)
+        const typedArray =
+          i === 0 || frames[i - 1].disposalType === 2
+            ? new Uint8ClampedArray(size)
             : readyFrames[i - 1].slice();
 
         readyFrames.push(putPixels(typedArray, frame, options));
@@ -25,6 +48,7 @@ export const parse = (src, { signal }) =>
 
       return {
         ...options,
+        loaded: true,
         delays: frames.map((frame) => frame.delay),
         frames: readyFrames,
       };
@@ -32,7 +56,7 @@ export const parse = (src, { signal }) =>
 
 const putPixels = (typedArray, frame, gifSize) => {
   const { width, height, top: dy, left: dx } = frame.dims;
-  const offset = dy * gifSize.width + dx
+  const offset = dy * gifSize.width + dx;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const pPos = y * width + x;

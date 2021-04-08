@@ -18,10 +18,14 @@ expectError(usePlayback({ playing: 123 }, () => 0));
 
 // parser tests
 
-useParser("test", ({ width, height }) => {
-  expectType<number>(width)
-  expectType<number>(height)
-})
+useParser("test", (info) => {
+  if (!("error" in info)) {
+    const { width, height, loaded } = info;
+    expectType<number>(width);
+    expectType<number>(height);
+    expectType<true>(loaded);
+  }
+});
 useParser("str", () => 0);
 useParser(false, () => 0);
 useParser(undefined, () => 0);
@@ -32,10 +36,15 @@ useWorkerParser(undefined, () => 0);
 useWorkerParser(null, () => 0);
 
 useWorkerParser("str", (info) => {
-  info.delays;
-  info.frames;
-  info.height;
-  info.width;
+  if ("error" in info) {
+    info.error;
+    info.loaded;
+  } else {
+    info.delays;
+    info.frames;
+    info.height;
+    info.width;
+  }
 
   expectError(info.wrong);
 });
@@ -54,10 +63,10 @@ expectType(<Canvas index={0} frames={[]} width={100} height={300} />);
 
 expectType(<Canvas index={0} frames={[]} className="class" />);
 
-const idFrames = [new ImageData(2, 2)]
+const idFrames = [new ImageData(2, 2)];
 expectType(<Canvas index={0} frames={idFrames} className="class" />);
 
-const ibFrames = [new ImageBitmap()]
+const ibFrames = [new ImageBitmap()];
 expectError(<Canvas index={0} frames={ibFrames} className="class" />);
 
 expectError(React.createElement(Canvas, {}));
@@ -84,6 +93,17 @@ usePlayback(pstate, () => update({ index: 10 }));
 expectError(usePlayback(pstate, update));
 
 expectType(<Canvas {...pstate} />);
+
+const ref = React.createRef<HTMLCanvasElement>();
+expectType(<Canvas {...pstate} ref={ref} />);
+expectType(
+  <Canvas
+    {...pstate}
+    ref={(ref) => {
+      expectType<HTMLCanvasElement | null>(ref);
+    }}
+  />
+);
 
 useWorkerParser("str", update);
 useParser("str", update);

@@ -1,4 +1,4 @@
-import { parse } from "./parse-generate";
+import { parse } from "../parse-generate";
 
 const abortMap = new Map();
 
@@ -13,13 +13,19 @@ self.addEventListener("message", (e) => {
 
         abortMap.set(src, controller);
 
-        parse(src, signal).then((result) => {
-          abortMap.delete(src);
-          self.postMessage(
-            Object.assign(result, { src: src }),
-            result.frames.map((frame) => frame.buffer)
-          );
-        });
+        parse(src, signal)
+          .then((result) => {
+            self.postMessage(
+              Object.assign(result, { src }),
+              result.frames.map((frame) => frame.buffer)
+            );
+          })
+          .catch((error) => {
+            self.postMessage({ src, error, loaded: true });
+          })
+          .finally(() => {
+            abortMap.delete(src);
+          });
       }
 
       break;
